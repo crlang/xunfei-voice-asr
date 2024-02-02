@@ -172,15 +172,11 @@ module.exports = class XunFeiVoiceASR {
     this.state = 'end';
       try {
         this.mediaStream.disconnect(this.recorder);
-      } catch (e) {}
-
-      try {
-        this.context.close();
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         this.recorder.disconnect(this.context.destination);
-      } catch (e) {}
+      } catch (e) { }
 
       if (isFunction(this.config.onVoiceVolume)) {
         this.config.onVoiceVolume(0);
