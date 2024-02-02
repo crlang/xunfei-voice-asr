@@ -170,26 +170,27 @@ module.exports = class XunFeiVoiceASR {
 
   stop() {
     this.state = 'end';
-    try {
-      if(this.mediaStream?.isConnected(this.recorder)) {
+      try {
         this.mediaStream.disconnect(this.recorder);
-      }
-      if(this.recorder?.isConnected(this.context.destination)) {
+      } catch (e) {}
+
+      try {
+        this.context.close();
+      } catch (e) {}
+
+      try {
         this.recorder.disconnect(this.context.destination);
-      }
+      } catch (e) {}
+
       if (isFunction(this.config.onVoiceVolume)) {
         this.config.onVoiceVolume(0);
       }
+
       setTimeout(()=>{
         if (isFunction(this.config.onClose)) {
           this.config.onClose();
         }
       },256);
-    } catch (e) {
-      if (isFunction(this.config.onError)) {
-        this.config.onError('停止录音异常', e);
-      }
-    }
   }
 
   sendData (buffer) {
