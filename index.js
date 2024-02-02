@@ -136,6 +136,9 @@ module.exports = class XunFeiVoiceASR {
             })
             .then((stream) => {
               getMediaSuccess(stream);
+              if (isFunction(this.config.onInitUserMedia)) {
+                this.config.onInitUserMedia(stream);
+              }
             })
             .catch((e) => {
               getMediaFail(e);
@@ -168,8 +171,12 @@ module.exports = class XunFeiVoiceASR {
   stop() {
     this.state = 'end';
     try {
-      this.mediaStream.disconnect(this.recorder);
-      this.recorder.disconnect();
+      if(this.mediaStream?.isConnected(this.recorder)) {
+        this.mediaStream.disconnect(this.recorder);
+      }
+      if(this.recorder?.isConnected(this.context.destination)) {
+        this.recorder.disconnect(this.context.destination);
+      }
       if (isFunction(this.config.onVoiceVolume)) {
         this.config.onVoiceVolume(0);
       }
@@ -223,11 +230,13 @@ module.exports = class XunFeiVoiceASR {
       setTimeout(() => {
         this.wsOpened(e);
       }, 256);
-      this.config.onStart && this.config.onStart(e);
+      if(isFunction(this.config.onWebSocketOpen)) {
+        this.config.onWebSocketOpen(e);
+      }
     };
     this.ws.onmessage = (e) => {
-      if (isFunction(this.config.onVoiceMessage)) {
-        this.config.onVoiceMessage(e);
+      if (isFunction(this.config.onWebSocketMessage)) {
+        this.config.onWebSocketMessage(e);
       }
       setTimeout(()=>{
         this.wsOnMessage(e);
@@ -235,11 +244,17 @@ module.exports = class XunFeiVoiceASR {
     };
     this.ws.onerror = (e) => {
       this.stop();
+      if (isFunction(this.config.onWebSocketError)) {
+        this.config.onWebSocketError(e);
+      }
       if(isFunction(this.config.onError)) {
         this.config.onError('WebSocket连接错误', e);
       }
     };
     this.ws.onclose = (e) => {
+      if (isFunction(this.config.onWebSocketClose)) {
+        this.config.onWebSocketClose(e);
+      }
       this.stop();
     };
   }

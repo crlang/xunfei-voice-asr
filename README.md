@@ -27,29 +27,41 @@
 config 示例：
 ```js
 const config = {
-  // 启动时回调
-  onStart: (err) => {
-    console.log('onStart', err);
+  // ws启动时回调
+  onWebSocketOpen: (res) => {
+    console.log('onWebSocketOpen', res);
+  },
+  // ws数据交互时回调
+  onWebSocketMessage: (res) => {
+    console.log('onWebSocketMessage', res);
+  },
+  // ws关闭时回调
+  onWebSocketClose: (res) => {
+    console.log('onWebSocketClose', res);
+  },
+  // ws错误时回调
+  onWebSocketError: (res) => {
+    console.log('onWebSocketError', res);
+  },
+  // 初始化录音成功时回调
+  onInitUserMedia: (stream) => {
+    console.log('onInitUserMedia', stream);
   },
   // 关闭时回调
-  onClose: (err) => {
-    console.log('onClose', err);
+  onClose: (res) => {
+    console.log('onClose', res);
   },
   // 错误时回调
-  onError: (err) => {
-    console.log('onError', err);
-  },
-  // 数据交互时回调
-  onVoiceMessage: (err) => {
-    console.log('onVoiceMessage', err);
+  onError: (res, err) => {
+    console.log('onError', res, err);
   },
   // 实时分贝值回调
-  onVoiceVolume: (err) => {
-    console.log('onVoiceVolume', err);
+  onVoiceVolume: (res) => {
+    console.log('onVoiceVolume', res);
   },
   // 返回结果
-  onResult: (err) => {
-    console.log('onResult', err);
+  onResult: (res, message) => {
+    console.log('onResult', res, message);
   },
 };
 ```
