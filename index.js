@@ -6,28 +6,22 @@ var recorderWorker = require('./dependencies/transformpcm.worker');
 // 记录处理的缓存音频
 var buffers = [];
 var AudioContext = window.AudioContext || window.webkitAudioContext;
-var notSupportTip = '请使用chrome浏览器';
 var md5 = require('./dependencies/md5');
 var CryptoJSNew = require('./dependencies/HmacSHA1');
 var CryptoJS = require('./dependencies/hmac-sha256');
-navigator.getUserMedia =
-  navigator.getUserMedia ||
-  navigator.webkitGetUserMedia ||
-  navigator.mozGetUserMedia ||
-  navigator.msGetUserMedia;
+var currentUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia
 
 /**
- *
- * @Description: 方法说明 从讯飞语音识别引擎返回参数筛选出识别结果
- * @method 方法名 setResult
- * @return {number | string } 返回值说明 语音识别结果
+ * 从讯飞语音识别引擎返回参数筛选出识别结果
+ * @method setResult
  * @param data 讯飞语音识别引擎返回结果
+ * @return number | string  返回值说明 语音识别结果
  */
-async function setResult(data) {
+function setResult(data) {
   var rtasrResult = [];
   rtasrResult[data.seg_id] = data;
   let str = '';
-  await rtasrResult.forEach(i => {
+  rtasrResult.forEach(i => {
     if (i.cn.st.type == 0) {
       i.cn.st.rt.forEach(j => {
         j.ws.forEach(k => {
@@ -42,104 +36,51 @@ async function setResult(data) {
 }
 
 /**
- *
- * @Description: 方法说明 处理数据格式 去中英文标点符号
- * @method 方法名 pureString
- * @return {number | string } 返回值说明 去逗号之后的数据
- * @param str 需要净化的字符串
+ * 是否函数
+ * @param val
+ * @returns boolean
  */
-function pureString(str) {
-  return str.replace(/[\ |\~|\`|\!|\@|\#|\$|\%|\^|\&|\*|\(|\)|\-|\_|\+|\=|\||\\|\[|\]|\{|\}|\;|\:|\"|\'|\,|\，|\、|\。|\？|\<|\.|\>|\/|\?]/g, "");
+function isFunction(val) {
+  return typeof val === 'function'
 }
 
 /**
- *
- * @Description: 方法说明 从之前设置的数据进行语句匹配，如果匹配成功则运行对应的成功方法
- * @method 方法名 checkStrResult
- * @return {Promise<>} 返回值说明 匹配成功与否
- * @param textData 预先设置的语句数据
- * @param pureStr 接口返回的净化后的字符串
+ * 是否字符串
+ * @param val
+ * @returns boolean
  */
-function checkStrResult(textData, pureStr,that) {
-  return new Promise((resolve, reject) => {
-      textData.forEach((item, index) => {
-        var textArray = item.text.split("|");
-        for(let i=0;i<=textArray.length-1;i++){
-          if (pureStr.indexOf(textArray[i]) > -1 && item.success && typeof item.success == 'function') {
-            item.success(item);
-            if (that.config.textResponse && typeof that.config.textResponse == 'function') {
-              that.config.textResponse({
-                result: pureStr,
-                dsc: '匹配成功'
-              });
-              resolve(false);
-              break
-            }
-            resolve(false);
-            break
-          }
-        }
-      });
-      resolve(pureStr)
-    }
-  );
+function isString(val) {
+  return typeof val === 'string'
 }
 
 /**
  *
  * @Description: 类说明
- * @method 类名 IatRecorder
- * @param {object} 参数名 config  参数说明 语音助手开启和结束时调用的方法
- * @param {Array} 参数名 textData  参数说明 语音指令集合
- * @param {string} 参数名 appId  参数说明 讯飞实时语音转写接口appId
- * @param {string} 参数名 apiKey  参数说明 讯飞实时语音转写接口apiKey
+ * @method XunFeiVoiceASR
+ * @param object config  参数说明 语音助手开启和结束时调用的方法
+ * @param Array textData  参数说明 语音指令集合
+ * @param string appId  参数说明 讯飞实时语音转写接口appId
+ * @param string apiKey  参数说明 讯飞实时语音转写接口apiKey
  */
-module.exports = class VoiceCore {
-  constructor(config, textData, appId, apiKey) {
+module.exports = class XunFeiVoiceASR {
+  constructor(config, appId, apiKey) {
     this.config = config;
     this.config.onMessage = (message) => {
       var text = setResult(JSON.parse(message));
-      text.then((res) => {
-          var pure = pureString(res);
-          if (!textData || !Array.isArray(textData)) {
-            console.info('数据格式错误，请检查格式');
-            if (this.config.onError && typeof this.config.onError == 'function') {
-              this.stop();
-              this.config.onError('数据格式错误，请检查格式');
-            }
-            throw '传入数据格式错误，请检查格式'
-          }
-          if (pure !== '') {
-            const strResult = checkStrResult(textData, pure,this);
-            strResult.then((val) => {
-              if (val && this.config.textResponse && typeof this.config.textResponse == 'function') {
-                this.config.textResponse({
-                  result: val,
-                  dsc: '无匹配数据'
-                })
-              }
-            })
-          }
-        },
-        (err) => {
-          if (this.config.onError && typeof this.config.onError == 'function') {
-            this.stop();
-            this.config.onError(err);
-          }
-          throw err
-        })
+      if (isFunction(this.config.onResult)) {
+        this.config.onResult(text, message)
+      }
     };
     this.state = 'end';
-    // 以下信息在控制台-我的应用-实时语音转写 页面获取
-    if (!appId || appId === '' || typeof appId !== 'string') {
-      if (this.config.onError && typeof this.config.onError == 'function') {
+    if (!appId || !isString(appId)) {
+      if (isFunction(this.config.onError)) {
         this.stop();
         this.config.onError('appId为空或格式错误');
       }
       throw 'appId为空或格式错误'
     }
-    if (!apiKey || apiKey === '' || typeof apiKey !== 'string') {
-      if (this.config.onError && typeof this.config.onError == 'function') {
+    if (!apiKey || !isString(apiKey)) {
+      if (isFunction(this.config.onError)) {
         this.stop();
         this.config.onError('apiKey为空或格式错误');
       }
@@ -152,13 +93,13 @@ module.exports = class VoiceCore {
   start() {
     // this.stop();
     if(this.state === 'ing'){
-      if (this.config.onError && typeof this.config.onError == 'function') {
+      if (isFunction(this.config.onError)) {
         this.stop();
-        this.config.onError('已经开启无须重复开启');
+        this.config.onError('请勿重复开启');
       }
       return false
     }
-    if (navigator.getUserMedia && AudioContext) {
+    if (currentUserMedia && AudioContext) {
       this.state = 'ing';
       if (!this.recorder) {
         const context = new AudioContext();
@@ -171,8 +112,8 @@ module.exports = class VoiceCore {
             this.sendData(voiceData);
             const maxVal = Math.max.apply(Math, voiceData);
             // 显示音量值
-            if (this.config.voiceValue && typeof this.config.voiceValue == 'function') {
-              this.config.voiceValue(Math.round(maxVal * 100));
+            if (isFunction(this.config.onVoiceVolume)) {
+              this.config.onVoiceVolume(Math.round(maxVal * 100));
             }
           };
           this.connectWebsocket();
@@ -181,9 +122,9 @@ module.exports = class VoiceCore {
           this.recorder = null;
           this.mediaStream = null;
           this.context = null;
-          if (this.config.onError && typeof this.config.onError == 'function') {
+          if (isFunction(this.config.onError)) {
             this.stop();
-            this.config.onError('请求麦克风失败');
+            this.config.onError('请求麦克风失败',e);
           }
           throw e
         };
@@ -200,7 +141,7 @@ module.exports = class VoiceCore {
               getMediaFail(e);
             });
         } else {
-          navigator.getUserMedia(
+          currentUserMedia(
             {
               audio: true,
               video: false,
@@ -217,12 +158,10 @@ module.exports = class VoiceCore {
         this.connectWebsocket();
       }
     } else {
-      const isChrome = navigator.userAgent.toLowerCase().match(/chrome/);
-      if (this.config.onError && typeof this.config.onError == 'function') {
+      if (isFunction(this.config.onError)) {
         this.stop();
-        this.config.onError(notSupportTip);
+        this.config.onError('浏览器不支持');
       }
-      throw notSupportTip
     }
   }
 
@@ -231,18 +170,18 @@ module.exports = class VoiceCore {
     try {
       this.mediaStream.disconnect(this.recorder);
       this.recorder.disconnect();
-      if (this.config.voiceValue && typeof this.config.voiceValue == 'function') {
-        this.config.voiceValue(0);
+      if (isFunction(this.config.onVoiceVolume)) {
+        this.config.onVoiceVolume(0);
       }
       setTimeout(()=>{
-        if (this.config.onClose && typeof this.config.onClose == 'function') {
+        if (isFunction(this.config.onClose)) {
           this.config.onClose();
         }
-      },500);
+      },256);
     } catch (e) {
-      // if (this.config.onError && typeof this.config.onError == 'function') {
-      //   this.config.onError(e);
-      // }
+      if (isFunction(this.config.onError)) {
+        this.config.onError('停止录音异常', e);
+      }
     }
   }
 
@@ -251,7 +190,7 @@ module.exports = class VoiceCore {
       command: 'transform',
       buffer: buffer,
     };
-    buffers = recorderWorker.onmessage(data);
+    buffers = recorderWorker.onmessage(data) || [];
   };
 
   // 生成握手参数
@@ -276,7 +215,6 @@ module.exports = class VoiceCore {
     } else if ('MozWebSocket' in window) {
       this.ws = new MozWebSocket(url);
     } else {
-      alert(notSupportTip);
       return null;
     }
     this.ws.onopen = (e) => {
@@ -284,20 +222,22 @@ module.exports = class VoiceCore {
       this.recorder.connect(this.context.destination);
       setTimeout(() => {
         this.wsOpened(e);
-      }, 500);
+      }, 256);
       this.config.onStart && this.config.onStart(e);
     };
     this.ws.onmessage = (e) => {
-      if (this.config.startMatching && typeof this.config.startMatching == 'function') {
-        this.config.startMatching();
+      if (isFunction(this.config.onVoiceMessage)) {
+        this.config.onVoiceMessage(e);
       }
       setTimeout(()=>{
         this.wsOnMessage(e);
-      },1000)
+      },64)
     };
     this.ws.onerror = (e) => {
       this.stop();
-      this.config.onError && this.config.onError(e);
+      if(isFunction(this.config.onError)) {
+        this.config.onError('WebSocket连接错误', e);
+      }
     };
     this.ws.onclose = (e) => {
       this.stop();
@@ -336,26 +276,16 @@ module.exports = class VoiceCore {
       // 握手成功
     } else if (jsonData.action == 'result') {
       // 转写结果
-      if (this.config.onMessage && typeof this.config.onMessage == 'function') {
+      if (isFunction(this.config.onMessage)) {
         this.config.onMessage(jsonData.data);
       }
     } else if (jsonData.action == 'error') {
       // 连接发生错误
-      if (this.config.onError && typeof this.config.onError == 'function') {
+      if (isFunction(this.config.onError)) {
         this.stop();
-        this.config.onError(jsonData);
+        this.config.onError('数据返回错误',e);
       }
       throw jsonData
     }
   }
-
-  ArrayBufferToBase64(buffer){
-    var binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (var i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-  };
 };
