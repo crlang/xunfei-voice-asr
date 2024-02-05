@@ -90,53 +90,53 @@ module.exports = class XunFeiVoiceASR {
     // if (currentUserMedia && AudioContext) {
 
     this.state = 'ing';
-    if (!this.recorder) {
-      const context = new AudioContext();
-      this.context = context;
-      const recorder = context.createScriptProcessor(0, 1, 1);
-      this.recorder = recorder
-      const getMediaSuccess = (stream) => {
-        this.mediaStream = stream
-        this.recorderStream = context.createMediaStreamSource(stream);
-        recorder.onaudioprocess = (e) => {
-          const voiceData = e.inputBuffer.getChannelData(0);
-          this.sendData(voiceData);
-          const maxVal = Math.max.apply(Math, voiceData);
-          // 显示音量值
-          if (isFunction(this.config.onVoiceVolume)) {
-            this.config.onVoiceVolume(Math.round(maxVal * 100));
-          }
-        };
-        this.connectWebsocket();
-      };
-      const getMediaFail = (e) => {
-        this.recorder = null;
-        this.recorderStream = null;
-        this.context = null;
-        if (isFunction(this.config.onError)) {
-          this.stop();
-          this.config.onError('请求麦克风失败', e);
+    // if (!this.recorder) {
+    const context = new AudioContext();
+    this.context = context;
+    const recorder = context.createScriptProcessor(0, 1, 1);
+    this.recorder = recorder
+    const getMediaSuccess = (stream) => {
+      this.mediaStream = stream
+      this.recorderStream = context.createMediaStreamSource(stream);
+      recorder.onaudioprocess = (e) => {
+        const voiceData = e.inputBuffer.getChannelData(0);
+        this.sendData(voiceData);
+        const maxVal = Math.max.apply(Math, voiceData);
+        // 显示音量值
+        if (isFunction(this.config.onVoiceVolume)) {
+          this.config.onVoiceVolume(Math.round(maxVal * 100));
         }
-        throw e
       };
-
-      navigator.mediaDevices
-        .getUserMedia({
-          audio: true,
-          video: false,
-        })
-        .then((stream) => {
-          if (isFunction(this.config.onUserMedia)) {
-            this.config.onUserMedia(stream);
-          }
-          getMediaSuccess(stream);
-        })
-        .catch((e) => {
-          getMediaFail(e);
-        });
-    } else {
       this.connectWebsocket();
-    }
+    };
+    const getMediaFail = (e) => {
+      this.recorder = null;
+      this.recorderStream = null;
+      this.context = null;
+      if (isFunction(this.config.onError)) {
+        this.stop();
+        this.config.onError('请求麦克风失败', e);
+      }
+      throw e
+    };
+
+    navigator.mediaDevices
+      .getUserMedia({
+        audio: true,
+        video: false,
+      })
+      .then((stream) => {
+        if (isFunction(this.config.onUserMedia)) {
+          this.config.onUserMedia(stream);
+        }
+        getMediaSuccess(stream);
+      })
+      .catch((e) => {
+        getMediaFail(e);
+      });
+    // } else {
+    //   this.connectWebsocket();
+    // }
     // } else {
     //   if (isFunction(this.config.onError)) {
     //     this.stop();
@@ -147,17 +147,33 @@ module.exports = class XunFeiVoiceASR {
 
   stop() {
     this.state = 'end';
-    if (this.recorder) {
-      try {
-        if (this.recorderStream) {
-          this.recorderStream.disconnect(this.recorder);
-        }
-        if (this.context) {
-          this.recorder.disconnect(this.context.destination);
-        }
-      } catch (error) {
-        console.error('断开错误', error)
+    this.temptext = ''
+
+    try {
+      if (this.recorderStream) {
+        this.recorderStream.disconnect();
       }
+    } catch (error) {
+      console.error('MediaStreamAudioSourceNode 断开错误', error)
+    }
+
+    try {
+      if (this.recorder) {
+        this.recorder.disconnect();
+      }
+      this.recorder = null
+    } catch (error) {
+      console.error('ScriptProcessorNode 断开错误', error)
+    }
+
+    try {
+      if (this.mediaStream) {
+        this.mediaStream?.getTracks().forEach((track) => track.stop());
+      }
+      this.recorderStream = null
+      this.context = null
+    } catch (error) {
+      console.error('清除录音频道错误', error)
     }
 
     if (isFunction(this.config.onVoiceVolume)) {
@@ -309,11 +325,13 @@ module.exports = class XunFeiVoiceASR {
 
       if (this.state === 'end') {
         if (this.wsLoadingState) {
-          this.wsLoadingState = false
-          if (isFunction(this.config.onResult)) {
-            this.config.onResult(this.temptext, jsonData)
-          }
+          setTimeout(() => {
+            if (isFunction(this.config.onResult)) {
+              this.config.onResult(this.temptext, jsonData)
+            }
+          }, 400);
         }
+        this.wsLoadingState = false
       }
 
     } else if (jsonData.action == 'error') {

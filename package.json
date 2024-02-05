@@ -1,6 +1,6 @@
 {
   "name": "xunfei-voice-asr",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "讯飞实时语音转写 API 封装库",
   "main": "index.js",
   "scripts": {
